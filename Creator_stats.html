@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filmie - Stats</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            padding-bottom: 80px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stats-section {
+            padding: 20px;
+        }
+
+        .films-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .film-stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .film-poster-small {
+            width: 80px;
+            height: 120px;
+            background: #666;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .film-poster-small img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .film-details {
+            flex: 1;
+        }
+
+        .film-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .film-uploaded {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .film-stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .stat-number {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .no-films {
+            text-align: center;
+            color: #666;
+            font-size: 1.2em;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: #667eea;
+        }
+
+        .nav-item span {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .nav-item small {
+            font-size: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Stats</h1>
+    </div>
+
+    <div class="stats-section">
+        <div id="statsContainer" class="loading">
+            Loading your film stats...
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item" onclick="navigateTo('creator_viewer.html')">
+            <span>📺</span>
+            <small>Home</small>
+        </div>
+        <div class="nav-item" onclick="navigateTo('creator_dashboard.html')">
+            <span>📷</span>
+            <small>Dashboard</small>
+        </div>
+        <div class="nav-item" onclick="navigateTo('creator_search.html')">
+            <span>🔍</span>
+            <small>Search</small>
+        </div>
+        <div class="nav-item" onclick="navigateTo('creator_profile.html')">
+            <span>👤</span>
+            <small>Profile</small>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDHwIhh6cHgeGmXTliMGemTlI7Ch1TnpHQ",
+            authDomain: "filmie-ce9ec.firebaseapp.com",
+            projectId: "filmie-ce9ec",
+            storageBucket: "filmie-ce9ec.firebasestorage.app",
+            messagingSenderId: "419419459537",
+            appId: "1:419419459537:web:843fa41655b185c8755af0",
+            measurementId: "G-X3TZJEKM4J"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        let currentUser = null;
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loadFilmStats();
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'Unknown date';
+            
+            let date;
+            if (timestamp.toDate) {
+                date = timestamp.toDate();
+            } else if (timestamp instanceof Date) {
+                date = timestamp;
+            } else {
+                date = new Date(timestamp);
+            }
+            
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        async function loadFilmStats() {
+            try {
+                const filmListDoc = await getDoc(doc(db, 'users', currentUser.uid, 'Films', 'FilmList'));
+                const statsContainer = document.getElementById('statsContainer');
+                
+                if (filmListDoc.exists()) {
+                    const filmListData = filmListDoc.data();
+                    const filmIds = Object.values(filmListData);
+                    
+                    if (filmIds.length > 0) {
+                        const userFilms = [];
+                        
+                        for (const filmId of filmIds) {
+                            try {
+                                const filmDoc = await getDoc(doc(db, 'Films', filmId));
+                                const statsDoc = await getDoc(doc(db, 'Films', filmId, 'Stats', 'info'));
+                                
+                                if (filmDoc.exists()) {
+                                    const filmData = filmDoc.data();
+                                    const statsData = statsDoc.exists() ? statsDoc.data() : { Views: 0, Likes: 0 };
+                                    
+                                    userFilms.push({
+                                        id: filmId,
+                                        ...filmData,
+                                        stats: statsData
+                                    });
+                                }
+                            } catch (error) {
+                                console.error('Error loading film:', filmId, error);
+                            }
+                        }
+                        
+                        statsContainer.innerHTML = `
+                            <div class="films-list">
+                                ${userFilms.map(film => `
+                                    <div class="film-stat-card">
+                                        <div class="film-poster-small">
+                                            ${film.PosterUrl ? 
+                                                `<img src="${film.PosterUrl}" alt="${film.Title}">` : 
+                                                'NO POSTER'
+                                            }
+                                        </div>
+                                        <div class="film-details">
+                                            <div class="film-title">${film.Title || 'Untitled'}</div>
+                                            <div class="film-uploaded">Uploaded: ${formatDate(film.uploadedAt)}</div>
+                                            <div class="film-stats">
+                                                <div class="stat-item">
+                                                    <span>👁️</span>
+                                                    <span class="stat-number">${film.stats.Views || 0}</span>
+                                                    <span>views</span>
+                                                </div>
+                                                <div class="stat-item">
+                                                    <span>❤️</span>
+                                                    <span class="stat-number">${film.stats.Likes || 0}</span>
+                                                    <span>likes</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    } else {
+                        statsContainer.innerHTML = '<div class="no-films">No films yet...</div>';
+                    }
+                } else {
+                    statsContainer.innerHTML = '<div class="no-films">No films yet...</div>';
+                }
+            } catch (error) {
+                console.error('Error loading film stats:', error);
+                document.getElementById('statsContainer').innerHTML = '<div class="no-films">Error loading stats</div>';
+            }
+        }
+
+        window.navigateTo = function(page) {
+            window.location.href = page;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filmie - Search</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            padding-bottom: 80px;
+        }
+
+        .search-container {
+            padding: 20px;
+            background: white;
+            border-bottom: 1px solid #eee;
+        }
+
+        .search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+            background: #f8f8f8;
+            border-radius: 25px;
+            padding: 12px 20px;
+        }
+
+        .search-icon {
+            font-size: 18px;
+            margin-right: 10px;
+            color: #666;
+        }
+
+        .search-input {
+            flex: 1;
+            border: none;
+            background: none;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .search-results {
+            padding: 20px;
+        }
+
+        .search-results-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .film-poster {
+            height: 180px;
+            background: #666;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .film-poster:hover {
+            transform: scale(1.05);
+        }
+
+        .film-poster img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .genres-section {
+            padding: 20px;
+        }
+
+        .genres-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .genres-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 15px;
+        }
+
+        .genre-button {
+            background: #e8e8e8;
+            border: none;
+            border-radius: 8px;
+            padding: 15px 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .genre-button:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: #667eea;
+        }
+
+        .nav-item span {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .nav-item small {
+            font-size: 10px;
+        }
+
+        .no-results {
+            text-align: center;
+            color: #666;
+            padding: 40px 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="search-container">
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" placeholder="Search for films..." id="searchInput">
+        </div>
+    </div>
+
+    <div class="search-results" id="searchResults" style="display: none;">
+        <div class="search-results-title">Search Results</div>
+        <div class="results-grid" id="resultsGrid">
+            <!-- Search results will be populated here -->
+        </div>
+    </div>
+
+    <div class="genres-section">
+        <div class="genres-title">Genres</div>
+        <div class="genres-grid" id="genresGrid">
+            <!-- Genres will be populated here -->
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item" onclick="navigateTo('viewer.html')">
+            <span>📺</span>
+            <small>Home</small>
+        </div>
+        <div class="nav-item active" onclick="navigateTo('search.html')">
+            <span>🔍</span>
+            <small>Search</small>
+        </div>
+        <div class="nav-item" onclick="navigateTo('viewerprofile.html')">
+            <span>👤</span>
+            <small>Profile</small>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, collection, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDHwIhh6cHgeGmXTliMGemTlI7Ch1TnpHQ",
+            authDomain: "filmie-ce9ec.firebaseapp.com",
+            projectId: "filmie-ce9ec",
+            storageBucket: "filmie-ce9ec.firebasestorage.app",
+            messagingSenderId: "419419459537",
+            appId: "1:419419459537:web:843fa41655b185c8755af0",
+            measurementId: "G-X3TZJEKM4J"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        let allFilms = [];
+        let allGenres = new Set();
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loadFilms();
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+
+        async function loadFilms() {
+            try {
+                const filmsSnapshot = await getDocs(collection(db, 'Films'));
+                allFilms = [];
+                
+                filmsSnapshot.forEach((doc) => {
+                    const filmData = doc.data();
+                    allFilms.push({
+                        id: doc.id,
+                        ...filmData
+                    });
+                    
+                    if (filmData.Genera) {
+                        allGenres.add(filmData.Genera);
+                    }
+                });
+
+                loadGenres();
+            } catch (error) {
+                console.error('Error loading films:', error);
+            }
+        }
+
+        function loadGenres() {
+            const genresGrid = document.getElementById('genresGrid');
+            const genres = Array.from(allGenres);
+            
+            genresGrid.innerHTML = genres.map(genre => `
+                <button class="genre-button" onclick="searchByGenre('${genre}')">
+                    ${genre}
+                </button>
+            `).join('');
+        }
+
+        function searchFilms(searchTerm) {
+            if (!searchTerm.trim()) {
+                document.getElementById('searchResults').style.display = 'none';
+                return;
+            }
+
+            const results = allFilms.filter(film => 
+                film.Title && film.Title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                film.Genera && film.Genera.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                film.Description && film.Description.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            displaySearchResults(results);
+        }
+
+        function displaySearchResults(films) {
+            const searchResults = document.getElementById('searchResults');
+            const resultsGrid = document.getElementById('resultsGrid');
+
+            if (films.length === 0) {
+                resultsGrid.innerHTML = '<div class="no-results">No films found</div>';
+            } else {
+                resultsGrid.innerHTML = films.map(film => `
+                    <div class="film-poster" onclick="openFilm('${film.id}')">
+                        ${film.PosterUrl ? `<img src="${film.PosterUrl}" alt="${film.Title}">` : 'NO TITLE FOUND'}
+                    </div>
+                `).join('');
+            }
+
+            searchResults.style.display = 'block';
+        }
+
+        window.openFilm = function(filmId) {
+            window.location.href = `filmtitle.html?id=${filmId}`;
+        }
+
+        window.searchByGenre = function(genre) {
+            const genreFilms = allFilms.filter(film => film.Genera === genre);
+            displaySearchResults(genreFilms);
+            document.getElementById('searchInput').value = genre;
+        }
+
+        window.navigateTo = function(page) {
+            window.location.href = page;
+        }
+
+        // Search input event listener
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            searchFilms(e.target.value);
+        });
+
+        // Handle enter key
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchFilms(e.target.value);
+            }
+        });
+    </script>
+</body>
+</html>

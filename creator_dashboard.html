@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Filmie - Creator Dashboard</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #fff;
+      margin: 0;
+      padding: 0 0 100px;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      font-weight: 800;
+      text-align: left;
+      margin: 20px;
+    }
+
+    .section-subtitle {
+      margin: 0 20px 10px;
+      font-size: 1em;
+      color: #333;
+    }
+
+    .films-row {
+      display: flex;
+      overflow-x: auto;
+      padding: 0 20px;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .film-card {
+      min-width: 120px;
+      height: 180px;
+      background: #666;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .latest-film-block {
+      margin: 0 20px 20px;
+      background: #e0e0e0;
+      padding: 30px 20px;
+      text-align: center;
+      border-radius: 10px;
+    }
+
+    .latest-film-block h2 {
+      margin: 0;
+      font-size: 1.2em;
+      color: #333;
+    }
+
+    .latest-film-block p {
+      font-size: 2.5em;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+
+    .latest-film-block a {
+      font-size: 0.95em;
+      color: #000;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .action-button {
+      display: block;
+      width: calc(100% - 40px);
+      margin: 10px 20px;
+      padding: 15px;
+      font-size: 1em;
+      font-weight: 600;
+      text-align: center;
+      background: #eee;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      color: #000;
+    }
+
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      border-top: 1px solid #eee;
+      display: flex;
+      justify-content: space-around;
+      padding: 15px 0;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #666;
+      font-size: 12px;
+      text-decoration: none;
+    }
+
+    .nav-item.active {
+      color: #667eea;
+    }
+
+    .nav-item span {
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>DASHBOARD</h1>
+  <div class="section-subtitle">Your Recent Films</div>
+
+  <div id="filmsContainer" class="films-row">
+    <!-- Populated with JS -->
+  </div>
+
+  <div id="latestFilmBlock" class="latest-film-block" style="display: none;">
+    <h2>Latest Film</h2>
+    <p id="latestFilmViews">0 Views</p>
+    <a id="viewStatsLink" href="#">Click to View more stats</a>
+  </div>
+
+  <a href="https://filmie.co.uk" class="action-button">Add new title</a>
+  <a href="your_films.html" class="action-button">View all titles</a>
+
+  <div class="bottom-nav">
+    <a href="creator_viewer.html" class="nav-item"><span>📺</span><small>Home</small></a>
+    <a href="creator_dashboard.html" class="nav-item active"><span>📷</span><small>Dashboard</small></a>
+    <a href="creator_search.html" class="nav-item"><span>🔍</span><small>Search</small></a>
+    <a href="creator_profile.html" class="nav-item"><span>👤</span><small>Profile</small></a>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDHwIhh6cHgeGmXTliMGemTlI7Ch1TnpHQ",
+      authDomain: "filmie-ce9ec.firebaseapp.com",
+      projectId: "filmie-ce9ec",
+      storageBucket: "filmie-ce9ec.appspot.com",
+      messagingSenderId: "419419459537",
+      appId: "1:419419459537:web:843fa41655b185c8755af0"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        currentUser = user;
+        await loadUserFilms();
+      } else {
+        window.location.href = 'index.html';
+      }
+    });
+
+    async function loadUserFilms() {
+      const container = document.getElementById('filmsContainer');
+      const latestBlock = document.getElementById('latestFilmBlock');
+      const latestViews = document.getElementById('latestFilmViews');
+      const statsLink = document.getElementById('viewStatsLink');
+
+      try {
+        const filmListDoc = await getDoc(doc(db, 'users', currentUser.uid, 'Films', 'FilmList'));
+
+        if (!filmListDoc.exists()) {
+          container.innerHTML = '<div class="film-card">NO FILMS</div>';
+          return;
+        }
+
+        const filmList = Object.values(filmListDoc.data());
+        const films = [];
+
+        for (let filmId of filmList) {
+          const filmDoc = await getDoc(doc(db, 'Films', filmId));
+          if (!filmDoc.exists()) continue;
+
+          const statsDoc = await getDoc(doc(db, 'Films', filmId, 'Stats', 'info'));
+          const filmData = filmDoc.data();
+          const stats = statsDoc.exists() ? statsDoc.data() : { Views: 0 };
+
+          films.push({
+            id: filmId,
+            title: filmData.Title || 'NO TITLE FOUND',
+            poster: filmData.PosterUrl || null,
+            uploadedAt: filmData.uploadedAt?.seconds || 0,
+            views: stats.Views || 0
+          });
+        }
+
+        if (films.length === 0) {
+          container.innerHTML = '<div class="film-card">NO FILMS</div>';
+          return;
+        }
+
+        // Sort by uploadedAt DESC
+        films.sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+        // Fill recent posters
+        container.innerHTML = films.map(film => `
+          <div class="film-card">
+            ${film.poster ? `<img src="${film.poster}" style="width:100%; height:100%; object-fit:cover; border-radius:4px;" />` : film.title}
+          </div>
+        `).join('');
+
+        // Set latest film view block
+        const latest = films[0];
+        latestBlock.style.display = 'block';
+        latestViews.textContent = `${latest.views} Views`;
+        statsLink.href = `creator_stats.html?film=${latest.id}`;
+      } catch (err) {
+        console.error('Failed to load films:', err);
+        container.innerHTML = '<div class="film-card">Error loading films</div>';
+      }
+    }
+  </script>
+</body>
+</html>
